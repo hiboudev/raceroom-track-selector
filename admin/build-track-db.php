@@ -10,6 +10,7 @@ $startTime = microtime(true);
 $trackList = [];
 downloadTrackList($trackList);
 downloadTrackDetails($trackList);
+downloadExtraDataFromOverlay($trackList);
 createCsv($trackList);
 
 $elapsedTime = microtime(true) - $startTime;
@@ -19,17 +20,26 @@ finish();
 
 function downloadTrackList(array &$list)
 {
+    write("Downloading global track list...");
+
     // $fileContent = file_get_contents("http://game.raceroom.com/store/tracks/?json");
     // $json        = json_decode($fileContent, true);
     $json = getShopJSON("http://game.raceroom.com/store/tracks/?json");
 
+    $totalLayoutCount = 0;
+
     foreach ($json["context"]["c"]["sections"][0]["items"] as $item) {
-        $list[] = new Track(
-            intval($item['cid']),
+        $trackId = intval($item['cid']);
+
+        $layoutCount = intval($item['content_info']['number_of_layouts']);
+        $totalLayoutCount += $layoutCount;
+
+        $list[$trackId] = new Track(
+            $trackId,
             $item['name'],
             $item['content_info']['country']['name'],
             $item['content_info']['track_type'], // Note: will be overwritten on detail parsing to get translation
-            intval($item['content_info']['number_of_layouts']),
+            $layoutCount,
             $item['description'],
             $item['image']['logo'],
             $item['image']['thumb'],
@@ -41,11 +51,13 @@ function downloadTrackList(array &$list)
             $item['path']
         );
     }
-    write(count($list) . ' tracks.');
+    write("Total of " . count($list) . " tracks, $totalLayoutCount layouts.");
 }
 
 function downloadTrackDetails(array &$list)
 {
+    write("Downloading details for " . count($list) . " tracks...");
+
     $count = 0;
     $total = count($list);
     foreach ($list as $track) {
@@ -57,7 +69,9 @@ function downloadTrackDetails(array &$list)
         $json      = getShopJSON("$track->url?json");
         $trackItem = $json["context"]["c"]["item"];
 
-        $track->type = $trackItem['specs_data']['track_type']; // Translated version only in detail page.
+        $track->type               = $trackItem['specs_data']['track_type']; // Translated version only in detail page.
+        $track->verticalDifference = $trackItem['specs_data']['vertical_difference'];
+        $track->location           = $trackItem['specs_data']['location'];
 
         if (key_exists('screenshots', $trackItem)) {
             $track->screenshot1 = $trackItem['screenshots'][0]['scaled']; // TODO pas pris les 3 formats
@@ -67,8 +81,10 @@ function downloadTrackDetails(array &$list)
         }
 
         foreach ($trackItem['related_items'] as $layoutItem) {
+            $layoutId = intval($layoutItem['cid']);
+
             $layout = new Layout(
-                intval($layoutItem['cid']),
+                $layoutId,
                 $track->id,
                 $layoutItem['name'],
                 $layoutItem['image']['thumb'],
@@ -78,24 +94,63 @@ function downloadTrackDetails(array &$list)
                 intval($layoutItem['content_info']['specs']['turns']),
                 $layoutItem['content_info']['name']
             );
-            $track->layouts[] = $layout;
+            $track->layouts[$layoutId] = $layout;
         }
     }
+}
+
+function downloadExtraDataFromOverlay(array &$trackList)
+{
+    write("Downloading extra data from S3S Overlay...");
+
+    $url = "https://raw.githubusercontent.com/sector3studios/r3e-spectator-overlay/master/r3e-data.json";
+    //$url         = "https://raw.githubusercontent.com/hiboudev/r3e-spectator-overlay/master/r3e-data.json";
+    $fileContent = file_get_contents($url);
+    $json        = null;
+
+    if ($fileContent !== false) {
+        // Removing invalid ';' at end of json.
+        $fileContent = preg_replace("/;\s*$/", '', $fileContent);
+        $json        = json_decode($fileContent, true);
+
+        if ($json == null) {
+            write("Error parsing JSON from URL: $url");
+            return;
+        }
+    } else {
+        write("Error getting file from URL: $url");
+        return;
+    }
+
+    $layoutCount = 0;
+
+    foreach ($json["layouts"] as $layoutItem) {
+        $layoutCount++;
+
+        $trackId  = intval($layoutItem['Track']);
+        $layoutId = intval($layoutItem['Id']);
+
+        $trackList[$trackId]->layouts[$layoutId]->maxVehicules = intval($layoutItem['MaxNumberOfVehicles']);
+    }
+
+    write("Added extra data for $layoutCount layouts.");
 }
 
 function createCsv(array &$list)
 {
     write("Creating Csv file...");
+    // TODO Escape "," and """ from all fields
 
     // UTF8 header
     $csvContent = "\xEF\xBB\xBF";
 
-    $csvContent .= "TrackId,LayoutId,TrackName,LayoutName,TrackType,Length (km),Turns,Country,TotalLayout,isFree,trackUrl,trackScreenshot1,trackScreenshot2,trackScreenshot3,trackScreenshot4,trackImgLogo,trackImgThumb,trackImgBig,trackImgFull,trackImgSignature,trackVideo,layoutImgThumb,layoutImgBig,layoutImgFull,Description\r\n";
+    $csvContent .= "TrackId,LayoutId,TrackName,LayoutName,TrackType,MaxVehicules,Length (km),VerticalDifference,Turns,Country,Location,TotalLayout,isFree,trackUrl,trackScreenshot1,trackScreenshot2,trackScreenshot3,trackScreenshot4,trackImgLogo,trackImgThumb,trackImgBig,trackImgFull,trackImgSignature,trackVideo,layoutImgThumb,layoutImgBig,layoutImgFull,Description\r\n";
 
     foreach ($list as $track) {
         foreach ($track->layouts as $layout) {
             $description = "\"" . str_replace("\"", "\"\"", $track->description) . "\"";
-            $csvContent .= "$track->id,$layout->id,$track->name,$layout->name,$track->type,$layout->length,$layout->turnCount,$track->country,$track->layoutCount,$track->isFree,$track->url,$track->screenshot1,$track->screenshot2,$track->screenshot3,$track->screenshot4,$track->imgLogo,$track->imgThumb,$track->imgBig,$track->imgFull,$track->imgSignature,$track->video,$layout->imgThumb,$layout->imgBig,$layout->imgFull,$description\r\n";
+            $isFree      = intval($track->isFree);
+            $csvContent .= "$track->id,$layout->id,$track->name,$layout->name,$track->type,$layout->maxVehicules,$layout->length,$track->verticalDifference,$layout->turnCount,$track->country,\"$track->location\",$track->layoutCount,$isFree,$track->url,$track->screenshot1,$track->screenshot2,$track->screenshot3,$track->screenshot4,$track->imgLogo,$track->imgThumb,$track->imgBig,$track->imgFull,$track->imgSignature,$track->video,$layout->imgThumb,$layout->imgBig,$layout->imgFull,$description\r\n";
         }
     }
 
@@ -179,6 +234,8 @@ class Track
     public $isFree;
     public $video;
     public $url;
+    public $verticalDifference;
+    public $location;
     public $screenshot1;
     public $screenshot2;
     public $screenshot3;
@@ -187,8 +244,7 @@ class Track
     public $layouts = [];
 
     public function __construct(int $id, string $name, string $country, string $type, int $layoutCount, string $description,
-        string $imgLogo, string $imgThumb, string $imgBig, string $imgFull, string $imgSignature, bool $isFree, ?string $video, string $url,
-        ?string $screenshot1 = null, ?string $screenshot2 = null, ?string $screenshot3 = null, ?string $screenshot4 = null) {
+        string $imgLogo, string $imgThumb, string $imgBig, string $imgFull, string $imgSignature, bool $isFree, ?string $video, string $url) {
 
         $this->id           = $id;
         $this->name         = $name;
@@ -204,11 +260,6 @@ class Track
         $this->isFree       = $isFree;
         $this->video        = $video;
         $this->url          = $url;
-        $this->screenshot1  = $screenshot1;
-        $this->screenshot2  = $screenshot2;
-        $this->screenshot3  = $screenshot3;
-        $this->screenshot4  = $screenshot4;
-
     }
 }
 
@@ -222,6 +273,7 @@ class Layout
     public $imgFull;
     public $length;
     public $turnCount;
+    public $maxVehicules;
 
     public function __construct(int $id, int $trackId, string $name, string $imgThumb, string $imgBig, string $imgFull, float $length, int $turnCount)
     {
