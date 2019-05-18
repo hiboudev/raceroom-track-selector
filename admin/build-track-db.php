@@ -5,17 +5,19 @@ ini_set('max_execution_time', '600');
 header('Content-Type: text/event-stream');
 header('Cache-Control: no-cache');
 
-$list = new TrackLayoutList();
-downloadTrackList($list);
-downloadTrackDetails($list);
+$trackList = [];
+downloadTrackList($trackList);
+downloadTrackDetails($trackList);
+createCsv($trackList);
+finish();
 
-function downloadTrackList(TrackLayoutList $list)
+function downloadTrackList(array &$list)
 {
     $fileContent = file_get_contents("http://game.raceroom.com/store/tracks/?json");
     $json        = json_decode($fileContent, true);
 
     foreach ($json["context"]["c"]["sections"][0]["items"] as $item) {
-        $list->tracks[] = new Track(
+        $list[] = new Track(
             intval($item['cid']),
             $item['name'],
             $item['content_info']['country']['name'],
@@ -32,22 +34,27 @@ function downloadTrackList(TrackLayoutList $list)
             $item['path']
         );
     }
-    write(count($list->tracks) . ' tracks.');
+    write(count($list) . ' tracks.');
 }
 
-function downloadTrackDetails(TrackLayoutList $list)
+function downloadTrackDetails(array &$list)
 {
-    foreach ($list->tracks as $track) {
-        write($track->name);
+    $count = 0;
+    $total = count($list);
+    foreach ($list as $track) {
+        $count++;
+        write("[$count/$total] $track->name ($track->layoutCount layout(s))");
 
         $fileContent = file_get_contents($track->url . "?json");
         $json        = json_decode($fileContent, true);
         $trackItem   = $json["context"]["c"]["item"];
 
-        $track->screenshot1 = $trackItem['screenshots'][0]['scaled']; // TODO pas pris les 3
-        $track->screenshot2 = $trackItem['screenshots'][1]['scaled'];
-        $track->screenshot3 = $trackItem['screenshots'][2]['scaled'];
-        $track->screenshot4 = $trackItem['screenshots'][3]['scaled'];
+        if (key_exists('screenshots', $trackItem)) {
+            $track->screenshot1 = $trackItem['screenshots'][0]['scaled']; // TODO pas pris les 3 formats
+            $track->screenshot2 = $trackItem['screenshots'][1]['scaled']; // TODO anticiper qu'il n'y en ai pas 4
+            $track->screenshot3 = $trackItem['screenshots'][2]['scaled'];
+            $track->screenshot4 = $trackItem['screenshots'][3]['scaled'];
+        }
 
         foreach ($trackItem['related_items'] as $layoutItem) {
             $layout = new Layout(
@@ -61,9 +68,32 @@ function downloadTrackDetails(TrackLayoutList $list)
                 intval($layoutItem['content_info']['specs']['turns']),
                 $layoutItem['content_info']['name']
             );
-            write(var_dump($layout));
+            $track->layouts[] = $layout;
         }
     }
+}
+
+function createCsv(array &$list)
+{
+    write("Creating Csv file...");
+
+    // UTF8 header
+    $csvContent = "\xEF\xBB\xBF";
+
+    $csvContent .= "TrackId,LayoutId,TrackName,LayoutName,TrackType,Length (km),Turns,Country,TotalLayout,isFree,trackUrl,trackScreenshot1,trackScreenshot2,trackScreenshot3,trackScreenshot4,trackImgLogo,trackImgThumb,trackImgBig,trackImgFull,trackImgSignature,trackVideo,layoutImgThumb,layoutImgBig,layoutImgFull,Description\r\n";
+
+    foreach ($list as $track) {
+        foreach ($track->layouts as $layout) {
+            $description = "\"" . str_replace("\"", "\"\"", $track->description) . "\"";
+            $csvContent .= "$track->id,$layout->id,$track->name,$layout->name,$track->type,$layout->length,$layout->turnCount,$track->country,$track->layoutCount,$track->isFree,$track->url,$track->screenshot1,$track->screenshot2,$track->screenshot3,$track->screenshot4,$track->imgLogo,$track->imgThumb,$track->imgBig,$track->imgFull,$track->imgSignature,$track->video,$layout->imgThumb,$layout->imgBig,$layout->imgFull,$description\r\n";
+        }
+    }
+
+    if (file_put_contents("../tracks.csv", $csvContent) === false) {
+        write("ERROR writing csv file!");
+    }
+
+    write("CSV file created successfully!");
 }
 
 function write($text)
@@ -79,12 +109,6 @@ function finish()
     echo "data: COMPLETE\n\n";
     ob_flush();
     flush();
-}
-
-class TrackLayoutList
-{
-    public $tracks  = [];
-    public $layouts = [];
 }
 
 class Track
@@ -107,6 +131,8 @@ class Track
     public $screenshot2;
     public $screenshot3;
     public $screenshot4;
+
+    public $layouts = [];
 
     public function __construct(int $id, string $name, string $country, string $type, int $layoutCount, string $description,
         string $imgLogo, string $imgThumb, string $imgBig, string $imgFull, string $imgSignature, bool $isFree, ?string $video, string $url,
