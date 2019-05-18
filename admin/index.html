@@ -20,7 +20,7 @@
 
         function updateDB() {
             document.getElementById("outputField").innerHTML = "";
-
+            // TODO ne pas pouvoir en lancer deux (idem dans le sélecteur de livrées)
             var source = new EventSource("build-track-db.php");
             source.onmessage = function (event) {
                 if (event.data == "COMPLETE")

@@ -7,6 +7,8 @@ header('Cache-Control: no-cache');
 
 $startTime = microtime(true);
 
+// TODO gérer les cas d'erreur (magasin hors-ligne) et sortir du script sans modifier le CSV
+
 $trackList = [];
 downloadTrackList($trackList);
 downloadTrackDetails($trackList);
@@ -22,8 +24,6 @@ function downloadTrackList(array &$list)
 {
     write("Downloading global track list...");
 
-    // $fileContent = file_get_contents("http://game.raceroom.com/store/tracks/?json");
-    // $json        = json_decode($fileContent, true);
     $json = getShopJSON("http://game.raceroom.com/store/tracks/?json");
 
     $totalLayoutCount = 0;
@@ -64,8 +64,6 @@ function downloadTrackDetails(array &$list)
         $count++;
         write("[$count/$total] $track->name ($track->layoutCount layout(s))");
 
-        // $fileContent = file_get_contents($track->url . "?json");
-        // $json        = json_decode($fileContent, true);
         $json      = getShopJSON("$track->url?json");
         $trackItem = $json["context"]["c"]["item"];
 
@@ -103,8 +101,7 @@ function downloadExtraDataFromOverlay(array &$trackList)
 {
     write("Downloading extra data from S3S Overlay...");
 
-    $url = "https://raw.githubusercontent.com/sector3studios/r3e-spectator-overlay/master/r3e-data.json";
-    //$url         = "https://raw.githubusercontent.com/hiboudev/r3e-spectator-overlay/master/r3e-data.json";
+    $url         = "https://raw.githubusercontent.com/sector3studios/r3e-spectator-overlay/master/r3e-data.json";
     $fileContent = file_get_contents($url);
     $json        = null;
 
