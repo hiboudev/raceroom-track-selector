@@ -54,18 +54,34 @@ function downloadTrackList(array &$list)
     write("Total of " . count($list) . " tracks, $totalLayoutCount layouts.");
 }
 
-function downloadTrackDetails(array &$list)
+function downloadTrackDetails(array &$trackList)
 {
-    write("Downloading details for " . count($list) . " tracks...");
+    write("Downloading details for " . count($trackList) . " tracks...");
 
     $count = 0;
-    $total = count($list);
-    foreach ($list as $track) {
-        $count++;
-        write("[$count/$total] $track->name ($track->layoutCount layout(s))");
+    $total = count($trackList);
 
-        $json      = getShopJSON("$track->url?json");
+    $curlList      = prepareCurlList($trackList);
+    $multiCurl     = getMultiCurl($curlList);
+    $progressCount = 0;
+
+    do {
+        $status = curl_multi_exec($multiCurl, $active);
+        if ($active) {
+            curl_multi_select($multiCurl);
+        }
+    } while ($active && $status == CURLM_OK);
+
+    releaseMultiCurl($multiCurl, $curlList);
+
+    foreach ($curlList as $curl) {
+        $response = curl_multi_getcontent($curl);
+        $json     = json_decode($response, true);
+
         $trackItem = $json["context"]["c"]["item"];
+
+        $trackId = intval($trackItem['cid']);
+        $track   = $trackList[$trackId];
 
         $track->type               = $trackItem['specs_data']['track_type']; // Translated version only in detail page.
         $track->verticalDifference = $trackItem['specs_data']['vertical_difference'];
@@ -95,6 +111,105 @@ function downloadTrackDetails(array &$list)
             $track->layouts[$layoutId] = $layout;
         }
     }
+    /*
+foreach ($list as $track) {
+$count++;
+write("[$count/$total] $track->name ($track->layoutCount layout(s))");
+
+$json      = getShopJSON("$track->url?json");
+$trackItem = $json["context"]["c"]["item"];
+
+$track->type               = $trackItem['specs_data']['track_type']; // Translated version only in detail page.
+$track->verticalDifference = $trackItem['specs_data']['vertical_difference'];
+$track->location           = $trackItem['specs_data']['location'];
+
+if (key_exists('screenshots', $trackItem)) {
+$track->screenshot1 = $trackItem['screenshots'][0]['scaled']; // TODO pas pris les 3 formats
+$track->screenshot2 = $trackItem['screenshots'][1]['scaled']; // TODO anticiper qu'il n'y en ai pas 4
+$track->screenshot3 = $trackItem['screenshots'][2]['scaled'];
+$track->screenshot4 = $trackItem['screenshots'][3]['scaled'];
+}
+
+foreach ($trackItem['related_items'] as $layoutItem) {
+$layoutId = intval($layoutItem['cid']);
+
+$layout = new Layout(
+$layoutId,
+$track->id,
+$layoutItem['name'],
+$layoutItem['image']['thumb'],
+$layoutItem['image']['big'],
+$layoutItem['image']['full'],
+floatval($layoutItem['content_info']['specs']['length']),
+intval($layoutItem['content_info']['specs']['turns']),
+$layoutItem['content_info']['name']
+);
+$track->layouts[$layoutId] = $layout;
+
+}
+}*/
+}
+
+function prepareCurlList(array &$trackList)
+{
+    $curlList = [];
+
+    // Request header
+    $header[0] = "Accept: text/xml,application/xml,application/xhtml+xml,";
+    $header[0] .= "text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5";
+    $header[] = "Cache-Control: max-age=0";
+    $header[] = "Connection: keep-alive";
+    $header[] = "Keep-Alive: 300";
+    $header[] = "Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7";
+    $header[] = "Accept-Language: fr-fr,en;q=0.5";
+    $header[] = "Pragma: ";
+
+    foreach ($trackList as $track) {
+        $request = curl_init();
+        curl_setopt($request, CURLOPT_URL, "$track->url?json");
+        //return the transfer as a string
+        curl_setopt($request, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($request, CURLOPT_HTTPHEADER, $header);
+
+        $curlList[] = $request;
+    }
+
+    return $curlList;
+}
+
+function getMultiCurl(array &$curlList)
+{
+    $multiCurl = curl_multi_init();
+    foreach ($curlList as $curl) {
+        curl_setopt($curl, CURLOPT_PROGRESSFUNCTION, "onCurlProgress");
+        curl_setopt($curl, CURLOPT_NOPROGRESS, false);
+        curl_multi_add_handle($multiCurl, $curl);
+        // break;
+    }
+    return $multiCurl;
+}
+
+function releaseMultiCurl($multiCurl, array &$curlList)
+{
+    foreach ($curlList as $curl) {
+        curl_multi_remove_handle($multiCurl, $curl);
+    }
+    curl_multi_close($multiCurl);
+}
+
+$progressCount = 0;
+function onCurlProgress($resource, $download_size, $downloaded, $upload_size, $uploaded)
+{
+    global $trackList;
+    global $progressCount;
+
+    // write("$download_size, $downloaded, $upload_size, $uploaded");
+    if ($download_size > 0 && $downloaded == $download_size) {
+        $progressCount++;
+        write("[$progressCount/ " . count($trackList) . "] " . curl_getinfo($resource, CURLINFO_EFFECTIVE_URL));
+        curl_setopt($resource, CURLOPT_NOPROGRESS, true);
+    }
+
 }
 
 function downloadExtraDataFromOverlay(array &$trackList)
