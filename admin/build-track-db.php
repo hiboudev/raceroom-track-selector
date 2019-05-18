@@ -28,7 +28,7 @@ function downloadTrackList(array &$list)
             intval($item['cid']),
             $item['name'],
             $item['content_info']['country']['name'],
-            $item['content_info']['track_type'],
+            $item['content_info']['track_type'], // Note: will be overwritten on detail parsing to get translation
             intval($item['content_info']['number_of_layouts']),
             $item['description'],
             $item['image']['logo'],
@@ -57,6 +57,8 @@ function downloadTrackDetails(array &$list)
         $json      = getShopJSON("$track->url?json");
         $trackItem = $json["context"]["c"]["item"];
 
+        $track->type = $trackItem['specs_data']['track_type']; // Translated version only in detail page.
+
         if (key_exists('screenshots', $trackItem)) {
             $track->screenshot1 = $trackItem['screenshots'][0]['scaled']; // TODO pas pris les 3 formats
             $track->screenshot2 = $trackItem['screenshots'][1]['scaled']; // TODO anticiper qu'il n'y en ai pas 4
@@ -78,7 +80,6 @@ function downloadTrackDetails(array &$list)
             );
             $track->layouts[] = $layout;
         }
-        break;
     }
 }
 
@@ -100,39 +101,20 @@ function createCsv(array &$list)
 
     if (file_put_contents("../tracks.csv", $csvContent) === false) {
         write("ERROR writing csv file!");
+    } else {
+        write("CSV file created successfully!");
     }
 
-    write("CSV file created successfully!");
 }
 
 function getShopJSON(string $url)
 {
-    $ch = curl_init();
-
-    // set url
-    curl_setopt($ch, CURLOPT_URL, $url);
-
-    //return the transfer as a string
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-
-    //set the header params
-    $header[0] = "Accept: text/xml,application/xml,application/xhtml+xml,";
-    $header[0] .= "text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5";
-    $header[] = "Cache-Control: max-age=0";
-    $header[] = "Connection: keep-alive";
-    $header[] = "Keep-Alive: 300";
-    $header[] = "Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7";
-    $header[] = "Accept-Language: fr-fr,en;q=0.5";
-    $header[] = "Pragma: ";
-
-    //assign to the curl request.
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
+    $request = getCurl($url);
 
     // $output contains the output string
-    $output = curl_exec($ch);
-
+    $output = curl_exec($request);
     // close curl resource to free up system resources
-    curl_close($ch);
+    curl_close($request);
 
     $json = json_decode($output, true);
 
@@ -143,6 +125,27 @@ function getShopJSON(string $url)
     }
 
     return $json;
+}
+
+function getCurl($url)
+{
+    // Request header
+    $header[0] = "Accept: text/xml,application/xml,application/xhtml+xml,";
+    $header[0] .= "text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5";
+    $header[] = "Cache-Control: max-age=0";
+    $header[] = "Connection: keep-alive";
+    $header[] = "Keep-Alive: 300";
+    $header[] = "Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7";
+    $header[] = "Accept-Language: fr-fr,en;q=0.5";
+    $header[] = "Pragma: ";
+
+    $request = curl_init();
+    curl_setopt($request, CURLOPT_URL, $url);
+    //return the transfer as a string
+    curl_setopt($request, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($request, CURLOPT_HTTPHEADER, $header);
+
+    return $request;
 }
 
 function write($text)
