@@ -5,16 +5,23 @@ ini_set('max_execution_time', '600');
 header('Content-Type: text/event-stream');
 header('Cache-Control: no-cache');
 
+$startTime = microtime(true);
+
 $trackList = [];
 downloadTrackList($trackList);
 downloadTrackDetails($trackList);
 createCsv($trackList);
+
+$elapsedTime = microtime(true) - $startTime;
+write("Total time: $elapsedTime s");
+
 finish();
 
 function downloadTrackList(array &$list)
 {
-    $fileContent = file_get_contents("http://game.raceroom.com/store/tracks/?json");
-    $json        = json_decode($fileContent, true);
+    // $fileContent = file_get_contents("http://game.raceroom.com/store/tracks/?json");
+    // $json        = json_decode($fileContent, true);
+    $json = getShopJSON("http://game.raceroom.com/store/tracks/?json");
 
     foreach ($json["context"]["c"]["sections"][0]["items"] as $item) {
         $list[] = new Track(
@@ -45,9 +52,10 @@ function downloadTrackDetails(array &$list)
         $count++;
         write("[$count/$total] $track->name ($track->layoutCount layout(s))");
 
-        $fileContent = file_get_contents($track->url . "?json");
-        $json        = json_decode($fileContent, true);
-        $trackItem   = $json["context"]["c"]["item"];
+        // $fileContent = file_get_contents($track->url . "?json");
+        // $json        = json_decode($fileContent, true);
+        $json      = getShopJSON("$track->url?json");
+        $trackItem = $json["context"]["c"]["item"];
 
         if (key_exists('screenshots', $trackItem)) {
             $track->screenshot1 = $trackItem['screenshots'][0]['scaled']; // TODO pas pris les 3 formats
@@ -70,6 +78,7 @@ function downloadTrackDetails(array &$list)
             );
             $track->layouts[] = $layout;
         }
+        break;
     }
 }
 
@@ -94,6 +103,46 @@ function createCsv(array &$list)
     }
 
     write("CSV file created successfully!");
+}
+
+function getShopJSON(string $url)
+{
+    $ch = curl_init();
+
+    // set url
+    curl_setopt($ch, CURLOPT_URL, $url);
+
+    //return the transfer as a string
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+
+    //set the header params
+    $header[0] = "Accept: text/xml,application/xml,application/xhtml+xml,";
+    $header[0] .= "text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5";
+    $header[] = "Cache-Control: max-age=0";
+    $header[] = "Connection: keep-alive";
+    $header[] = "Keep-Alive: 300";
+    $header[] = "Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7";
+    $header[] = "Accept-Language: fr-fr,en;q=0.5";
+    $header[] = "Pragma: ";
+
+    //assign to the curl request.
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
+
+    // $output contains the output string
+    $output = curl_exec($ch);
+
+    // close curl resource to free up system resources
+    curl_close($ch);
+
+    $json = json_decode($output, true);
+
+    if ($json === null) {
+        write("Error downloading/parsing JSON at $url");
+        finish();
+        exit(1);
+    }
+
+    return $json;
 }
 
 function write($text)
