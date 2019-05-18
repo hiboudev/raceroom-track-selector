@@ -40,7 +40,7 @@ function downloadTrackList(array &$list)
             $item['content_info']['country']['name'],
             $item['content_info']['track_type'], // Note: will be overwritten on detail parsing to get translation
             $layoutCount,
-            $item['description'],
+            preg_replace("/[\r|\n]/", "", trim($item['description'])), // TODO fait pour Excel, mais y-a t'il vraiment un problème ?
             $item['image']['logo'],
             $item['image']['thumb'],
             $item['image']['big'],
@@ -261,7 +261,8 @@ function createCsv(array &$list)
     foreach ($list as $track) {
         foreach ($track->layouts as $layout) {
             $description = "\"" . str_replace("\"", "\"\"", $track->description) . "\"";
-            $isFree      = intval($track->isFree);
+            // write("[$description]");
+            $isFree = intval($track->isFree);
             $csvContent .= "$track->id,$layout->id,$track->name,$layout->name,$track->type,$layout->maxVehicules,$layout->length,$track->verticalDifference,$layout->turnCount,$track->country,\"$track->location\",$track->layoutCount,$isFree,$track->url,$track->screenshot1,$track->screenshot2,$track->screenshot3,$track->screenshot4,$track->imgLogo,$track->imgThumb,$track->imgBig,$track->imgFull,$track->imgSignature,$track->video,$layout->imgThumb,$layout->imgBig,$layout->imgFull,$description\r\n";
         }
     }
