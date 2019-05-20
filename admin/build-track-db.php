@@ -16,12 +16,14 @@ DEFINE('GERMAN', 'de-DE');
 $startTime = microtime(true);
 
 $languages = [FRENCH, ENGLISH, ITALIAN, SPANISH, GERMAN];
-write("Starting script for " . count($languages) . " languages...");
+write("Starting script for " . count($languages) . " languages...<br />");
 foreach ($languages as $lang) {
     createCsvForLanguage($lang);
 }
 
 $elapsedTime = microtime(true) - $startTime;
+
+write("<strong>Job complete!</strong>");
 write("Total time: $elapsedTime s");
 
 finish();
@@ -32,7 +34,7 @@ global $progressCount;
 
 function createCsvForLanguage(string $language)
 {
-    write("## Computing data for language '$language'...");
+    write("<strong>======== Language '$language' ========</strong>");
     global $trackCount;
 
     $trackList = [];
@@ -186,10 +188,10 @@ function onCurlProgress($resource, $download_size, $downloaded, $upload_size, $u
     // write("$download_size, $downloaded, $upload_size, $uploaded");
     if ($download_size > 0 && $downloaded == $download_size) {
         $progressCount++;
-        write("[$progressCount/ " . $trackCount . "] " . curl_getinfo($resource, CURLINFO_EFFECTIVE_URL));
+        // write("[$progressCount/ " . $trackCount . "] " . curl_getinfo($resource, CURLINFO_EFFECTIVE_URL), false);
+        write("$progressCount ", $trackCount == $progressCount, false);
         curl_setopt($resource, CURLOPT_NOPROGRESS, true);
     }
-
 }
 
 function downloadExtraDataFromOverlay(array &$trackList)
@@ -255,7 +257,7 @@ function writeCsv(array &$list, string $language)
     if (file_put_contents("../tracks_$language.csv", $csvContent) === false) {
         write("ERROR writing csv file!");
     } else {
-        write("CSV file created successfully!");
+        write("CSV file created successfully!<br />");
     }
 }
 
@@ -318,17 +320,17 @@ function getRequestHeader(string $language): array
     return $header;
 }
 
-function write($text)
+function write($text, bool $addLineBreak = true, bool $addTime = true)
 {
     $time = date("H:i:s");
-    echo "data: [$time] $text\n\n";
+    echo "data:{\"message\":\"" . ($addTime ? "[$time] " : "") . $text . ($addLineBreak ? "<br />" : "") . "\"}\n\n";
     ob_flush();
     flush();
 }
 
 function finish()
 {
-    echo "data: COMPLETE\n\n";
+    echo "data:{\"message\":\"COMPLETE\"}" . "\n\n";
     ob_flush();
     flush();
 }
