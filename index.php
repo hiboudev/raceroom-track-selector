@@ -12,8 +12,7 @@
 
 <body>
 
-    <p>
-        Download Raceroom track and layout list as CSV (separator is comma ",").
+    <p>Download Raceroom track and layout list as CSV (separator is comma ",").
 <?php
 $files = glob("files/r3e-tracks_??-??.csv");
 $count = 0;

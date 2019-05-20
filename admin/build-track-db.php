@@ -226,14 +226,14 @@ function downloadExtraDataFromOverlay(): ?array
         return null;
     }
 
-    return $json;
+    return $json["layouts"];
 }
 
-function addExtraDataFromOverlay(array &$trackList, array &$extraJson)
+function addExtraDataFromOverlay(array &$trackList, array &$extraJsonLayouts)
 {
     $layoutCount = 0;
 
-    foreach ($extraJson["layouts"] as $layoutItem) {
+    foreach ($extraJsonLayouts as $layoutItem) {
         $layoutCount++;
 
         $trackId  = intval($layoutItem['Track']);
