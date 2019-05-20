@@ -5,26 +5,49 @@ ini_set('max_execution_time', '600');
 header('Content-Type: text/event-stream');
 header('Cache-Control: no-cache');
 
-$startTime = microtime(true);
-
 // TODO gérer les cas d'erreur (magasin hors-ligne) et sortir du script sans modifier le CSV
 
-$trackList = [];
-downloadTrackList($trackList);
-downloadTrackDetails($trackList);
-downloadExtraDataFromOverlay($trackList);
-createCsv($trackList);
+DEFINE('FRENCH', 'fr-FR');
+DEFINE('ENGLISH', 'en-US');
+DEFINE('ITALIAN', 'it-IT');
+DEFINE('SPANISH', 'es-ES');
+DEFINE('GERMAN', 'de-DE');
+
+$startTime = microtime(true);
+
+$languages = [FRENCH, ENGLISH, ITALIAN, SPANISH, GERMAN];
+write("Starting script for " . count($languages) . " languages...");
+foreach ($languages as $lang) {
+    createCsvForLanguage($lang);
+}
 
 $elapsedTime = microtime(true) - $startTime;
 write("Total time: $elapsedTime s");
 
 finish();
 
-function downloadTrackList(array &$list)
+// Used by progress handler.
+global $trackCount;
+global $progressCount;
+
+function createCsvForLanguage(string $language)
+{
+    write("## Computing data for language '$language'...");
+    global $trackCount;
+
+    $trackList = [];
+    downloadTrackList($trackList, $language);
+    $trackCount = count($trackList);
+    downloadTrackDetails($trackList, $language);
+    downloadExtraDataFromOverlay($trackList); // TODO pas besoin de télécharger pour chaque langue
+    writeCsv($trackList, $language);
+}
+
+function downloadTrackList(array &$list, string $language)
 {
     write("Downloading global track list...");
 
-    $json = getShopJSON("http://game.raceroom.com/store/tracks/?json");
+    $json = getShopJSON("http://game.raceroom.com/store/tracks/?json", $language);
 
     $totalLayoutCount = 0;
 
@@ -55,15 +78,16 @@ function downloadTrackList(array &$list)
     write("Total of " . count($list) . " tracks, $totalLayoutCount layouts.");
 }
 
-function downloadTrackDetails(array &$trackList)
+function downloadTrackDetails(array &$trackList, string $language)
 {
     write("Downloading details for " . count($trackList) . " tracks...");
 
     $count = 0;
     $total = count($trackList);
 
-    $curlList      = prepareCurlList($trackList);
-    $multiCurl     = getMultiCurl($curlList);
+    $curlList  = prepareCurlList($trackList, $language);
+    $multiCurl = getMultiCurl($curlList);
+    global $progressCount;
     $progressCount = 0;
 
     do {
@@ -88,9 +112,9 @@ function downloadTrackDetails(array &$trackList)
 
         $vDiff = preg_replace("/(\d+)\s?m.*/", "$1", $trackItem['specs_data']['vertical_difference']);
 
-        $track->type               = $trackItem['specs_data']['track_type']; // Translated version only in detail page.
-        $track->verticalDifference = $vDiff;
-        $track->location           = $trackItem['specs_data']['location'];
+        $track->type             = $trackItem['specs_data']['track_type']; // Translated version only in detail page.
+        $track->heightDifference = floatval($vDiff);
+        $track->location         = $trackItem['specs_data']['location'];
 
         if (key_exists('screenshots', $trackItem)) {
             $track->screenshot1 = $trackItem['screenshots'][0]['scaled']; // TODO pas pris les 3 formats
@@ -118,26 +142,15 @@ function downloadTrackDetails(array &$trackList)
     }
 }
 
-function prepareCurlList(array &$trackList)
+function prepareCurlList(array &$trackList, string $language)
 {
     $curlList = [];
-
-    // Request header
-    $header[0] = "Accept: text/xml,application/xml,application/xhtml+xml,";
-    $header[0] .= "text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5";
-    $header[] = "Cache-Control: max-age=0";
-    $header[] = "Connection: keep-alive";
-    $header[] = "Keep-Alive: 300";
-    $header[] = "Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7";
-    $header[] = "Accept-Language: fr-fr,en;q=0.5";
-    $header[] = "Pragma: ";
-
     foreach ($trackList as $track) {
         $request = curl_init();
         curl_setopt($request, CURLOPT_URL, "$track->url?json");
         //return the transfer as a string
         curl_setopt($request, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($request, CURLOPT_HTTPHEADER, $header);
+        curl_setopt($request, CURLOPT_HTTPHEADER, getRequestHeader($language));
 
         $curlList[] = $request;
     }
@@ -165,16 +178,15 @@ function releaseMultiCurl($multiCurl, array &$curlList)
     curl_multi_close($multiCurl);
 }
 
-$progressCount = 0;
 function onCurlProgress($resource, $download_size, $downloaded, $upload_size, $uploaded)
 {
-    global $trackList;
+    global $trackCount;
     global $progressCount;
 
     // write("$download_size, $downloaded, $upload_size, $uploaded");
     if ($download_size > 0 && $downloaded == $download_size) {
         $progressCount++;
-        write("[$progressCount/ " . count($trackList) . "] " . curl_getinfo($resource, CURLINFO_EFFECTIVE_URL));
+        write("[$progressCount/ " . $trackCount . "] " . curl_getinfo($resource, CURLINFO_EFFECTIVE_URL));
         curl_setopt($resource, CURLOPT_NOPROGRESS, true);
     }
 
@@ -216,7 +228,7 @@ function downloadExtraDataFromOverlay(array &$trackList)
     write("Added extra data for $layoutCount layouts.");
 }
 
-function createCsv(array &$list)
+function writeCsv(array &$list, string $language)
 {
     write("Creating Csv file...");
     // TODO Escape "," and """ from all fields
@@ -232,22 +244,37 @@ function createCsv(array &$list)
             // Excel seems to dislike line breaks.
             $description = preg_replace("/\s+/", " ", $description);
             // write("[$description]");
-            $isFree = intval($track->isFree);
-            $csvContent .= "$track->id,$layout->id,$track->name,$layout->name,$track->type,$layout->maxVehicules,$layout->length,$track->verticalDifference,$layout->turnCount,$track->country,\"$track->location\",$track->layoutCount,$isFree,$track->url,$track->screenshot1,$track->screenshot2,$track->screenshot3,$track->screenshot4,$track->imgLogo,$track->imgThumb,$track->imgBig,$track->imgFull,$track->imgSignature,$track->video,$layout->imgThumb,$layout->imgBig,$layout->imgFull,$description\r\n";
+            $isFree     = intval($track->isFree);
+            $length     = localizeNumber($layout->length, $language);
+            $heightDiff = localizeNumber($track->heightDifference, $language);
+
+            $csvContent .= "$track->id,$layout->id,$track->name,$layout->name,$track->type,$layout->maxVehicules,\"$length\",\"$heightDiff\",$layout->turnCount,$track->country,\"$track->location\",$track->layoutCount,$isFree,$track->url,$track->screenshot1,$track->screenshot2,$track->screenshot3,$track->screenshot4,$track->imgLogo,$track->imgThumb,$track->imgBig,$track->imgFull,$track->imgSignature,$track->video,$layout->imgThumb,$layout->imgBig,$layout->imgFull,$description\r\n";
         }
     }
 
-    if (file_put_contents("../tracks.csv", $csvContent) === false) {
+    if (file_put_contents("../tracks_$language.csv", $csvContent) === false) {
         write("ERROR writing csv file!");
     } else {
         write("CSV file created successfully!");
     }
-
 }
 
-function getShopJSON(string $url)
+function localizeNumber(float $number, string $language): string
 {
-    $request = getCurl($url);
+    switch ($language) {
+        case FRENCH:
+        case GERMAN:
+            return number_format($number, 3, ",", "");
+        case ITALIAN:
+            return number_format($number, 3, ",", ".");
+        default:
+            return number_format($number, 3, ".", ",");
+    }
+}
+
+function getShopJSON(string $url, string $language)
+{
+    $request = getCurl($url, $language);
 
     // $output contains the output string
     $output = curl_exec($request);
@@ -265,7 +292,18 @@ function getShopJSON(string $url)
     return $json;
 }
 
-function getCurl($url)
+function getCurl($url, string $language)
+{
+    $request = curl_init();
+    curl_setopt($request, CURLOPT_URL, $url);
+    //return the transfer as a string
+    curl_setopt($request, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($request, CURLOPT_HTTPHEADER, getRequestHeader($language));
+
+    return $request;
+}
+
+function getRequestHeader(string $language): array
 {
     // Request header
     $header[0] = "Accept: text/xml,application/xml,application/xhtml+xml,";
@@ -274,16 +312,10 @@ function getCurl($url)
     $header[] = "Connection: keep-alive";
     $header[] = "Keep-Alive: 300";
     $header[] = "Accept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7";
-    $header[] = "Accept-Language: fr-fr,en;q=0.5";
+    $header[] = "Accept-Language: $language,en;q=0.5";
     $header[] = "Pragma: ";
 
-    $request = curl_init();
-    curl_setopt($request, CURLOPT_URL, $url);
-    //return the transfer as a string
-    curl_setopt($request, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($request, CURLOPT_HTTPHEADER, $header);
-
-    return $request;
+    return $header;
 }
 
 function write($text)
@@ -317,7 +349,7 @@ class Track
     public $isFree;
     public $video;
     public $url;
-    public $verticalDifference;
+    public $heightDifference;
     public $location;
     public $screenshot1;
     public $screenshot2;
