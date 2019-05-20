@@ -16,9 +16,11 @@ DEFINE('GERMAN', 'de-DE');
 $startTime = microtime(true);
 
 $languages = [FRENCH, ENGLISH, ITALIAN, SPANISH, GERMAN];
-write("Starting script for " . count($languages) . " languages...<br />");
+write("Starting script for " . count($languages) . " languages...");
+
+$extraDataJson = downloadExtraDataFromOverlay();
 foreach ($languages as $lang) {
-    createCsvForLanguage($lang);
+    createCsvForLanguage($lang, $extraDataJson);
 }
 
 $elapsedTime = microtime(true) - $startTime;
@@ -32,16 +34,18 @@ finish();
 global $trackCount;
 global $progressCount;
 
-function createCsvForLanguage(string $language)
+function createCsvForLanguage(string $language, $extraDataJson)
 {
     write("<strong>======== Language '$language' ========</strong>");
     global $trackCount;
 
     $trackList = [];
-    downloadTrackList($trackList, $language);
+    downloadTrackList($trackList, $language); // TODO besoin de le faire qu'une fois pour tous les languages
     $trackCount = count($trackList);
     downloadTrackDetails($trackList, $language);
-    downloadExtraDataFromOverlay($trackList); // TODO pas besoin de télécharger pour chaque langue
+    if ($extraDataJson != null) {
+        addExtraDataFromOverlay($trackList, $extraDataJson);
+    }
     writeCsv($trackList, $language);
 }
 
@@ -194,9 +198,9 @@ function onCurlProgress($resource, $download_size, $downloaded, $upload_size, $u
     }
 }
 
-function downloadExtraDataFromOverlay(array &$trackList)
+function downloadExtraDataFromOverlay(): ?array
 {
-    write("Downloading extra data from S3S Overlay...");
+    write("Downloading unlocalized extra data from S3S Overlay...");
 
     $url         = "https://raw.githubusercontent.com/sector3studios/r3e-spectator-overlay/master/r3e-data.json";
     $fileContent = file_get_contents($url);
@@ -209,16 +213,21 @@ function downloadExtraDataFromOverlay(array &$trackList)
 
         if ($json == null) {
             write("Error parsing JSON from URL: $url");
-            return;
+            return null;
         }
     } else {
         write("Error getting file from URL: $url");
-        return;
+        return null;
     }
 
+    return $json;
+}
+
+function addExtraDataFromOverlay(array &$trackList, array &$extraJson)
+{
     $layoutCount = 0;
 
-    foreach ($json["layouts"] as $layoutItem) {
+    foreach ($extraJson["layouts"] as $layoutItem) {
         $layoutCount++;
 
         $trackId  = intval($layoutItem['Track']);
@@ -232,7 +241,8 @@ function downloadExtraDataFromOverlay(array &$trackList)
 
 function writeCsv(array &$list, string $language)
 {
-    write("Creating Csv file...");
+    $fileName = "tracks_$language.csv";
+    write("Creating Csv file '$fileName'...");
     // TODO Escape "," and """ from all fields
 
     // UTF8 header
@@ -254,10 +264,10 @@ function writeCsv(array &$list, string $language)
         }
     }
 
-    if (file_put_contents("../tracks_$language.csv", $csvContent) === false) {
+    if (file_put_contents("../$fileName", $csvContent) === false) {
         write("ERROR writing csv file!");
     } else {
-        write("CSV file created successfully!<br />");
+        write("CSV file created successfully!");
     }
 }
 
