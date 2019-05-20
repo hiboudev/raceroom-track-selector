@@ -75,6 +75,8 @@ function downloadTrackDetails(array &$trackList)
 
     releaseMultiCurl($multiCurl, $curlList);
 
+    write("Parsing details for " . count($trackList) . " tracks...");
+
     foreach ($curlList as $curl) {
         $response = curl_multi_getcontent($curl);
         $json     = json_decode($response, true);
@@ -84,8 +86,10 @@ function downloadTrackDetails(array &$trackList)
         $trackId = intval($trackItem['cid']);
         $track   = $trackList[$trackId];
 
+        $vDiff = preg_replace("/(\d+)\s?m.*/", "$1", $trackItem['specs_data']['vertical_difference']);
+
         $track->type               = $trackItem['specs_data']['track_type']; // Translated version only in detail page.
-        $track->verticalDifference = $trackItem['specs_data']['vertical_difference'];
+        $track->verticalDifference = $vDiff;
         $track->location           = $trackItem['specs_data']['location'];
 
         if (key_exists('screenshots', $trackItem)) {
@@ -112,43 +116,6 @@ function downloadTrackDetails(array &$trackList)
             $track->layouts[$layoutId] = $layout;
         }
     }
-    /*
-foreach ($list as $track) {
-$count++;
-write("[$count/$total] $track->name ($track->layoutCount layout(s))");
-
-$json      = getShopJSON("$track->url?json");
-$trackItem = $json["context"]["c"]["item"];
-
-$track->type               = $trackItem['specs_data']['track_type']; // Translated version only in detail page.
-$track->verticalDifference = $trackItem['specs_data']['vertical_difference'];
-$track->location           = $trackItem['specs_data']['location'];
-
-if (key_exists('screenshots', $trackItem)) {
-$track->screenshot1 = $trackItem['screenshots'][0]['scaled']; // TODO pas pris les 3 formats
-$track->screenshot2 = $trackItem['screenshots'][1]['scaled']; // TODO anticiper qu'il n'y en ai pas 4
-$track->screenshot3 = $trackItem['screenshots'][2]['scaled'];
-$track->screenshot4 = $trackItem['screenshots'][3]['scaled'];
-}
-
-foreach ($trackItem['related_items'] as $layoutItem) {
-$layoutId = intval($layoutItem['cid']);
-
-$layout = new Layout(
-$layoutId,
-$track->id,
-$layoutItem['name'],
-$layoutItem['image']['thumb'],
-$layoutItem['image']['big'],
-$layoutItem['image']['full'],
-floatval($layoutItem['content_info']['specs']['length']),
-intval($layoutItem['content_info']['specs']['turns']),
-$layoutItem['content_info']['name']
-);
-$track->layouts[$layoutId] = $layout;
-
-}
-}*/
 }
 
 function prepareCurlList(array &$trackList)
@@ -257,7 +224,7 @@ function createCsv(array &$list)
     // UTF8 header
     $csvContent = "\xEF\xBB\xBF";
 
-    $csvContent .= "TrackId,LayoutId,TrackName,LayoutName,TrackType,MaxVehicules,Length (km),VerticalDifference,Turns,Country,Location,TotalLayout,isFree,trackUrl,trackScreenshot1,trackScreenshot2,trackScreenshot3,trackScreenshot4,trackImgLogo,trackImgThumb,trackImgBig,trackImgFull,trackImgSignature,trackVideo,layoutImgThumb,layoutImgBig,layoutImgFull,Description\r\n";
+    $csvContent .= "TrackId,LayoutId,TrackName,LayoutName,TrackType,MaxVehicules,Length (km),HeightDifference (m),Turns,Country,Location,TotalLayout,IsFree,TrackUrl,TrackScreenshot1,TrackScreenshot2,TrackScreenshot3,TrackScreenshot4,TrackImgLogo,TrackImgThumb,TrackImgBig,TrackImgFull,TrackImgSignature,TrackVideo,LayoutImgThumb,LayoutImgBig,LayoutImgFull,Description\r\n";
 
     foreach ($list as $track) {
         foreach ($track->layouts as $layout) {
