@@ -13,14 +13,21 @@ DEFINE('ITALIAN', 'it-IT');
 DEFINE('SPANISH', 'es-ES');
 DEFINE('GERMAN', 'de-DE');
 
+// Used by progress handler.
+global $trackCount;
+global $progressCount;
+
 $startTime = microtime(true);
 
 $languages = [FRENCH, ENGLISH, ITALIAN, SPANISH, GERMAN];
 write("Starting script for " . count($languages) . " languages...");
 
 $extraDataJson = downloadExtraDataFromOverlay();
+$trackList     = downloadTrackList();
+$trackCount    = count($trackList);
+
 foreach ($languages as $lang) {
-    createCsvForLanguage($lang, $extraDataJson);
+    createCsvForLanguage($trackList, $lang, $extraDataJson);
 }
 
 $elapsedTime = microtime(true) - $startTime;
@@ -30,18 +37,10 @@ write("Total time: $elapsedTime s");
 
 finish();
 
-// Used by progress handler.
-global $trackCount;
-global $progressCount;
-
-function createCsvForLanguage(string $language, $extraDataJson)
+function createCsvForLanguage(array &$trackList, string $language, $extraDataJson)
 {
     write("<strong>======== Language '$language' ========</strong>");
-    global $trackCount;
 
-    $trackList = [];
-    downloadTrackList($trackList, $language); // TODO besoin de le faire qu'une fois pour tous les languages
-    $trackCount = count($trackList);
     downloadTrackDetails($trackList, $language);
     if ($extraDataJson != null) {
         addExtraDataFromOverlay($trackList, $extraDataJson);
@@ -49,13 +48,16 @@ function createCsvForLanguage(string $language, $extraDataJson)
     writeCsv($trackList, $language);
 }
 
-function downloadTrackList(array &$list, string $language)
+function downloadTrackList()
 {
-    write("Downloading global track list...");
+    write("Downloading unlocalized global track list...");
 
-    $json = getShopJSON("http://game.raceroom.com/store/tracks/?json", $language);
+    // No need to localize
+    $json = getShopJSON("http://game.raceroom.com/store/tracks/?json", ENGLISH);
 
     $totalLayoutCount = 0;
+
+    $list = [];
 
     foreach ($json["context"]["c"]["sections"][0]["items"] as $item) {
         $trackId = intval($item['cid']);
@@ -70,7 +72,7 @@ function downloadTrackList(array &$list, string $language)
             $item['content_info']['track_type'], // Note: will be overwritten on detail parsing to get translation
             $layoutCount,
             // Excel seems to dislike line breaks.
-            trim($item['description']),
+            trim($item['description']), // TODO enlever
             $item['image']['logo'],
             $item['image']['thumb'],
             $item['image']['big'],
@@ -82,6 +84,8 @@ function downloadTrackList(array &$list, string $language)
         );
     }
     write("Total of " . count($list) . " tracks, $totalLayoutCount layouts.");
+
+    return $list;
 }
 
 function downloadTrackDetails(array &$trackList, string $language)
@@ -121,6 +125,7 @@ function downloadTrackDetails(array &$trackList, string $language)
         $track->type             = $trackItem['specs_data']['track_type']; // Translated version only in detail page.
         $track->heightDifference = floatval($vDiff);
         $track->location         = $trackItem['specs_data']['location'];
+        $track->description      = trim($trackItem['description']);
 
         if (key_exists('screenshots', $trackItem)) {
             $track->screenshot1 = $trackItem['screenshots'][0]['scaled']; // TODO pas pris les 3 formats
@@ -166,6 +171,7 @@ function prepareCurlList(array &$trackList, string $language)
 
 function getMultiCurl(array &$curlList)
 {
+    // TODO gérer magasin offline
     $multiCurl = curl_multi_init();
     foreach ($curlList as $curl) {
         curl_setopt($curl, CURLOPT_PROGRESSFUNCTION, "onCurlProgress");
@@ -241,7 +247,7 @@ function addExtraDataFromOverlay(array &$trackList, array &$extraJson)
 
 function writeCsv(array &$list, string $language)
 {
-    $fileName = "tracks_$language.csv";
+    $fileName = "r3e-tracks_$language.csv";
     write("Creating Csv file '$fileName'...");
     // TODO Escape "," and """ from all fields
 
@@ -264,7 +270,7 @@ function writeCsv(array &$list, string $language)
         }
     }
 
-    if (file_put_contents("../$fileName", $csvContent) === false) {
+    if (file_put_contents("../files/$fileName", $csvContent) === false) {
         write("ERROR writing csv file!");
     } else {
         write("CSV file created successfully!");
@@ -278,6 +284,7 @@ function localizeNumber(float $number, string $language): string
         case GERMAN:
             return number_format($number, 3, ",", "");
         case ITALIAN:
+        case SPANISH:
             return number_format($number, 3, ",", ".");
         default:
             return number_format($number, 3, ".", ",");
@@ -292,6 +299,11 @@ function getShopJSON(string $url, string $language)
     $output = curl_exec($request);
     // close curl resource to free up system resources
     curl_close($request);
+
+    if (!$output) {
+        write("Error accessing S3S shop, is it offline?");
+        exit(1);
+    }
 
     $json = json_decode($output, true);
 
