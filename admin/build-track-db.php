@@ -32,14 +32,13 @@ foreach ($languages as $lang) {
 
 $elapsedTime = microtime(true) - $startTime;
 
-write("<strong>Job complete!</strong>");
-write("Total time: $elapsedTime s");
+write("<h3>Job complete!</h3>Total time: " . number_format($elapsedTime, 3) . " s");
 
 finish();
 
 function createCsvForLanguage(array &$trackList, string $language, $extraDataJson)
 {
-    write("<strong>======== Language '$language' ========</strong>");
+    write("<strong><u>Language '$language'</u></strong>");
 
     downloadTrackDetails($trackList, $language);
     if ($extraDataJson != null) {
@@ -128,10 +127,22 @@ function downloadTrackDetails(array &$trackList, string $language)
         $track->description      = trim($trackItem['description']);
 
         if (key_exists('screenshots', $trackItem)) {
-            $track->screenshot1 = $trackItem['screenshots'][0]['scaled']; // TODO pas pris les 3 formats
-            $track->screenshot2 = $trackItem['screenshots'][1]['scaled']; // TODO anticiper qu'il n'y en ai pas 4
-            $track->screenshot3 = $trackItem['screenshots'][2]['scaled'];
-            $track->screenshot4 = $trackItem['screenshots'][3]['scaled'];
+            // TODO anticiper qu'il n'y en ai pas 4
+            $track->screenshot1Thumb  = $trackItem['screenshots'][0]['thumb'];
+            $track->screenshot1Scaled = $trackItem['screenshots'][0]['scaled'];
+            $track->screenshot1Full   = $trackItem['screenshots'][0]['full'];
+
+            $track->screenshot2Thumb  = $trackItem['screenshots'][1]['thumb'];
+            $track->screenshot2Scaled = $trackItem['screenshots'][1]['scaled'];
+            $track->screenshot2Full   = $trackItem['screenshots'][1]['full'];
+
+            $track->screenshot3Thumb  = $trackItem['screenshots'][2]['thumb'];
+            $track->screenshot3Scaled = $trackItem['screenshots'][2]['scaled'];
+            $track->screenshot3Full   = $trackItem['screenshots'][2]['full'];
+
+            $track->screenshot4Thumb  = $trackItem['screenshots'][3]['thumb'];
+            $track->screenshot4Scaled = $trackItem['screenshots'][3]['scaled'];
+            $track->screenshot4Full   = $trackItem['screenshots'][3]['full'];
         }
 
         foreach ($trackItem['related_items'] as $layoutItem) {
@@ -254,7 +265,7 @@ function writeCsv(array &$list, string $language)
     // UTF8 header
     $csvContent = "\xEF\xBB\xBF";
 
-    $csvContent .= "TrackId,LayoutId,TrackName,LayoutName,TrackType,MaxVehicules,Length (km),HeightDifference (m),Turns,Country,Location,TotalLayout,IsFree,TrackUrl,TrackScreenshot1,TrackScreenshot2,TrackScreenshot3,TrackScreenshot4,TrackImgLogo,TrackImgThumb,TrackImgBig,TrackImgFull,TrackImgSignature,TrackVideo,LayoutImgThumb,LayoutImgBig,LayoutImgFull,Description\r\n";
+    $csvContent .= "TrackId,LayoutId,TrackName,LayoutName,TrackType,MaxVehicules,Length (km),HeightDifference (m),Turns,Country,Location,TotalLayout,IsFree,TrackUrl,TrackScreenshot1Thumb,TrackScreenshot1Scaled,TrackScreenshot1Full,TrackScreenshot2Thumb,TrackScreenshot2Scaled,TrackScreenshot2Full,TrackScreenshot3Thumb,TrackScreenshot3Scaled,TrackScreenshot3Full,TrackScreenshot4Thumb,TrackScreenshot4Scaled,TrackScreenshot4Full,TrackImgLogo,TrackImgThumb,TrackImgBig,TrackImgFull,TrackImgSignature,TrackVideo,LayoutImgThumb,LayoutImgBig,LayoutImgFull,Description\r\n";
 
     foreach ($list as $track) {
         foreach ($track->layouts as $layout) {
@@ -266,7 +277,7 @@ function writeCsv(array &$list, string $language)
             $length     = localizeNumber($layout->length, $language);
             $heightDiff = localizeNumber($track->heightDifference, $language);
 
-            $csvContent .= "$track->id,$layout->id,$track->name,$layout->name,$track->type,$layout->maxVehicules,\"$length\",\"$heightDiff\",$layout->turnCount,$track->country,\"$track->location\",$track->layoutCount,$isFree,$track->url,$track->screenshot1,$track->screenshot2,$track->screenshot3,$track->screenshot4,$track->imgLogo,$track->imgThumb,$track->imgBig,$track->imgFull,$track->imgSignature,$track->video,$layout->imgThumb,$layout->imgBig,$layout->imgFull,$description\r\n";
+            $csvContent .= "$track->id,$layout->id,$track->name,$layout->name,$track->type,$layout->maxVehicules,\"$length\",\"$heightDiff\",$layout->turnCount,$track->country,\"$track->location\",$track->layoutCount,$isFree,$track->url,$track->screenshot1Thumb,$track->screenshot1Scaled,$track->screenshot1Full,$track->screenshot2Thumb,$track->screenshot2Scaled,$track->screenshot2Full,$track->screenshot3Thumb,$track->screenshot3Scaled,$track->screenshot3Full,$track->screenshot4Thumb,$track->screenshot4Scaled,$track->screenshot4Full,$track->imgLogo,$track->imgThumb,$track->imgBig,$track->imgFull,$track->imgSignature,$track->video,$layout->imgThumb,$layout->imgBig,$layout->imgFull,$description\r\n";
         }
     }
 
@@ -375,10 +386,18 @@ class Track
     public $url;
     public $heightDifference;
     public $location;
-    public $screenshot1;
-    public $screenshot2;
-    public $screenshot3;
-    public $screenshot4;
+    public $screenshot1Thumb;
+    public $screenshot1Scaled;
+    public $screenshot1Full;
+    public $screenshot2Thumb;
+    public $screenshot2Scaled;
+    public $screenshot2Full;
+    public $screenshot3Thumb;
+    public $screenshot3Scaled;
+    public $screenshot3Full;
+    public $screenshot4Thumb;
+    public $screenshot4Scaled;
+    public $screenshot4Full;
 
     public $layouts = [];
 
