@@ -67,11 +67,7 @@ function downloadTrackList()
         $list[$trackId] = new Track(
             $trackId,
             $item['name'],
-            $item['content_info']['country']['name'],
-            $item['content_info']['track_type'], // Note: will be overwritten on detail parsing to get translation
             $layoutCount,
-            // Excel seems to dislike line breaks.
-            trim($item['description']), // TODO enlever
             $item['image']['logo'],
             $item['image']['thumb'],
             $item['image']['big'],
@@ -125,6 +121,8 @@ function downloadTrackDetails(array &$trackList, string $language)
         $track->heightDifference = floatval($vDiff);
         $track->location         = $trackItem['specs_data']['location'];
         $track->description      = trim($trackItem['description']);
+        $track->country          = $trackItem['content_info']['country']['name'];
+        $track->trackType        = $trackItem['content_info']['track_type'];
 
         if (key_exists('screenshots', $trackItem)) {
             // TODO anticiper qu'il n'y en ai pas 4
@@ -395,15 +393,13 @@ class Track
 
     public $layouts = [];
 
-    public function __construct(int $id, string $name, string $country, string $type, int $layoutCount, string $description,
-        string $imgLogo, string $imgThumb, string $imgBig, string $imgFull, string $imgSignature, bool $isFree, ?string $video, string $url) {
+    public function __construct(int $id, string $name, int $layoutCount,
+        string $imgLogo, string $imgThumb, string $imgBig, string $imgFull, string $imgSignature, bool $isFree,
+        ?string $video, string $url) {
 
         $this->id           = $id;
         $this->name         = $name;
-        $this->country      = $country;
-        $this->type         = $type;
         $this->layoutCount  = $layoutCount;
-        $this->description  = $description;
         $this->imgLogo      = $imgLogo;
         $this->imgThumb     = $imgThumb;
         $this->imgBig       = $imgBig;
