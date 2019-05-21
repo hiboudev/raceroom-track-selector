@@ -13,31 +13,40 @@
         body {
             font-family: sans-serif
         }
+        th, td {
+            padding: 5px 20px;
+            border-bottom: 1px solid #ddd;
+        }
     </style>
 </head>
 
 <body>
     <h3>Download Raceroom track and layout list as CSV</h3>
     <p>
+        <table><thead><tr><th>File</th><th>Last updated (GMT)</th></tr></thead><tbody>
 <?php
 $files = glob("../files/r3e-tracks_??-??.csv");
 $count = 0;
-echo "<ul>";
 foreach ($files as $file) {
+    echo "<tr>";
     if (!is_file($file)) {
         continue;
     }
     $count++;
-    echo "<li><a href=\"$file\">" . basename($file) . "</a></li>";
+    $fileName    = basename($file);
+    $lastModDate = gmdate("d/m/y H:i", filemtime($file));
+
+    echo "<td><a href=\"$file\">" . $fileName . "</a></td><td><small>$lastModDate</small></td>";
+    echo "</tr>";
 }
-echo "</ul>";
+echo "</tbody></table>";
 if ($count == 0) {
     echo "No file found.";
 }
 
 ?>
-<small><em>Separator: comma ","<br/>Encoding: UTF-8 with BOM</em></small>
     </p>
+    <p><small><em>Separator: comma ","<br/>Encoding: UTF-8 with BOM</em></small></p>
 
 </body>
 </html>
