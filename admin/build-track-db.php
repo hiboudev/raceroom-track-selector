@@ -183,7 +183,6 @@ function getMultiCurl(array &$curlList)
         curl_setopt($curl, CURLOPT_PROGRESSFUNCTION, "onCurlProgress");
         curl_setopt($curl, CURLOPT_NOPROGRESS, false);
         curl_multi_add_handle($multiCurl, $curl);
-        // break;
     }
     return $multiCurl;
 }
@@ -201,7 +200,6 @@ function onCurlProgress($resource, $download_size, $downloaded, $upload_size, $u
     global $trackCount;
     global $progressCount;
 
-    // write("$download_size, $downloaded, $upload_size, $uploaded");
     if ($download_size > 0 && $downloaded == $download_size) {
         $progressCount++;
         // write("[$progressCount/ " . $trackCount . "] " . curl_getinfo($resource, CURLINFO_EFFECTIVE_URL), false);
@@ -263,10 +261,9 @@ function writeCsv(array &$list, string $language)
             $description = "\"" . str_replace("\"", "\"\"", $track->description) . "\"";
             // Excel seems to dislike line breaks.
             $description = preg_replace("/\s+/", " ", $description);
-            // write("[$description]");
-            $isFree     = intval($track->isFree);
-            $length     = localizeNumber($layout->length, $language);
-            $heightDiff = localizeNumber($track->heightDifference, $language);
+            $isFree      = intval($track->isFree);
+            $length      = localizeNumber($layout->length, $language);
+            $heightDiff  = localizeNumber($track->heightDifference, $language);
 
             $csvContent .= "$track->id,$layout->id,$track->name,$layout->name,$track->type,$layout->maxVehicules,\"$length\",\"$heightDiff\",$layout->turnCount,$track->country,\"$track->location\",$track->layoutCount,$isFree,$track->url,$track->screenshot1Thumb,$track->screenshot1Scaled,$track->screenshot1Full,$track->screenshot2Thumb,$track->screenshot2Scaled,$track->screenshot2Full,$track->screenshot3Thumb,$track->screenshot3Scaled,$track->screenshot3Full,$track->screenshot4Thumb,$track->screenshot4Scaled,$track->screenshot4Full,$track->imgLogo,$track->imgThumb,$track->imgBig,$track->imgFull,$track->imgSignature,$track->video,$layout->imgThumb,$layout->imgBig,$layout->imgFull,$description\r\n";
         }
@@ -295,9 +292,7 @@ function getShopJSON(string $url, string $language)
 {
     $request = getCurl($url, $language);
 
-    // $output contains the output string
     $output = curl_exec($request);
-    // close curl resource to free up system resources
     curl_close($request);
 
     if (!$output) {
@@ -320,7 +315,7 @@ function getCurl($url, string $language)
 {
     $request = curl_init();
     curl_setopt($request, CURLOPT_URL, $url);
-    //return the transfer as a string
+    // return the transfer as a string
     curl_setopt($request, CURLOPT_RETURNTRANSFER, 1);
     curl_setopt($request, CURLOPT_HTTPHEADER, getRequestHeader($language));
 

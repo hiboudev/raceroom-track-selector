@@ -34,11 +34,10 @@
             var source = new EventSource("build-track-db.php");
             source.onmessage = function (event) {
                 var data = JSON.parse(event.data).message;
-                // alert(event.data);
                 if (data == "COMPLETE")
                     source.close();
                 else {
-                    document.getElementById("outputField").innerHTML += data;// + "<br />";
+                    document.getElementById("outputField").innerHTML += data;
                     var scrollingElement = (document.scrollingElement || document.body);
                     scrollingElement.scrollTop = scrollingElement.scrollHeight;
                 }
