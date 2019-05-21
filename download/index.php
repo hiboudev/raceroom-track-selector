@@ -41,7 +41,7 @@ foreach ($files as $file) {
     $fileName    = basename($file);
     $lastModDate = gmdate("d/m/y H:i", filemtime($file));
 
-    echo "<tr><td><a href=\"$file\">" . $fileName . "</a></td><td><small>$lastModDate</small></td></tr>";
+    echo "<tr><td><a href=\"$file\">$fileName</a></td><td><small>$lastModDate</small></td></tr>";
 }
 echo "</tbody></table>";
 if ($count == 0) {
