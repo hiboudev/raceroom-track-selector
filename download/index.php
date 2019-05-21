@@ -17,13 +17,19 @@
             padding: 5px 20px;
             border-bottom: 1px solid #ddd;
         }
+        table a {
+            text-decoration: none;
+        }
+        table a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 
 <body>
     <h3>Download Raceroom track and layout list as CSV</h3>
     <p>
-        <table><thead><tr><th>File</th><th>Last updated (GMT)</th></tr></thead><tbody>
+        <table><thead><tr><th>File</th><th>Last update (GMT)</th></tr></thead><tbody>
 <?php
 $files = glob("../files/r3e-tracks_??-??.csv");
 $count = 0;
