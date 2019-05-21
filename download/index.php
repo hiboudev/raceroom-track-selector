@@ -34,7 +34,6 @@
 $files = glob("../files/r3e-tracks_??-??.csv");
 $count = 0;
 foreach ($files as $file) {
-    echo "<tr>";
     if (!is_file($file)) {
         continue;
     }
@@ -42,8 +41,7 @@ foreach ($files as $file) {
     $fileName    = basename($file);
     $lastModDate = gmdate("d/m/y H:i", filemtime($file));
 
-    echo "<td><a href=\"$file\">" . $fileName . "</a></td><td><small>$lastModDate</small></td>";
-    echo "</tr>";
+    echo "<tr><td><a href=\"$file\">" . $fileName . "</a></td><td><small>$lastModDate</small></td></tr>";
 }
 echo "</tbody></table>";
 if ($count == 0) {
