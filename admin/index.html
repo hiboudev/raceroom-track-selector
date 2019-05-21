@@ -4,10 +4,10 @@
 
 <head>
     <meta charset="utf-8">
-    <link rel="icon" type="image/png" href="images/favicon.png" />
+    <!--link rel="icon" type="image/png" href="images/favicon.png" /-->
 
-    <title>Administration du sélecteur de circuit</title>
-    <meta name="description" content="Page d'administration du sélecteur de circuit" />
+    <title>Track list administration</title>
+    <meta name="description" content="Track list administration" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -24,7 +24,7 @@
     <script>
         function onPageLoaded() {
             if (typeof (EventSource) === "undefined") {
-                alert("Erreur : Votre navigateur internet ne supporte pas la fonctionnalité 'Server-Sent Events'.");
+                alert("Erreur : Your browser doesn't support the feature 'Server-Sent Events'.");
             }
         }
 
@@ -52,7 +52,7 @@
 </head>
 
 <body onLoad="onPageLoaded()">
-    <button onclick="updateDB()">Mettre à jour le fichier CSV</button>
+    <button onclick="updateDB()">Update CSV files</button>
     <div id="outputField">
     </div>
 </body>

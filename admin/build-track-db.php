@@ -20,7 +20,7 @@ global $progressCount;
 $startTime = microtime(true);
 
 $languages = [FRENCH, ENGLISH, ITALIAN, SPANISH, GERMAN];
-write("Starting script for " . count($languages) . " languages...");
+write("Starting script for " . count($languages) . " languages");
 
 $extraDataJson = downloadExtraDataFromOverlay();
 $trackList     = downloadTrackList();
@@ -32,7 +32,7 @@ foreach ($languages as $lang) {
 
 $elapsedTime = microtime(true) - $startTime;
 
-write("<h3>Job complete!</h3>Total time: " . number_format($elapsedTime, 3) . " s");
+write("<h3>Job complete!</h3>Total time: " . number_format($elapsedTime, 3) . " s", true, false);
 
 finish();
 
@@ -49,7 +49,7 @@ function createCsvForLanguage(array &$trackList, string $language, $extraDataJso
 
 function downloadTrackList()
 {
-    write("Downloading unlocalized global track list...");
+    write("Downloading unlocalized global track list");
 
     // No need to localize
     $json = getShopJSON("http://game.raceroom.com/store/tracks/?json", ENGLISH);
@@ -82,14 +82,14 @@ function downloadTrackList()
             $item['path']
         );
     }
-    write("Total of " . count($list) . " tracks, $totalLayoutCount layouts.");
+    write("Total of <b>" . count($list) . " tracks</b>, <b>$totalLayoutCount layouts</b>");
 
     return $list;
 }
 
 function downloadTrackDetails(array &$trackList, string $language)
 {
-    write("Downloading details for " . count($trackList) . " tracks...");
+    write("Downloading details for " . count($trackList) . " tracks", false);
 
     $count = 0;
     $total = count($trackList);
@@ -108,7 +108,7 @@ function downloadTrackDetails(array &$trackList, string $language)
 
     releaseMultiCurl($multiCurl, $curlList);
 
-    write("Parsing details for " . count($trackList) . " tracks...");
+    write("Parsing details for " . count($trackList) . " tracks");
 
     foreach ($curlList as $curl) {
         $response = curl_multi_getcontent($curl);
@@ -210,14 +210,14 @@ function onCurlProgress($resource, $download_size, $downloaded, $upload_size, $u
     if ($download_size > 0 && $downloaded == $download_size) {
         $progressCount++;
         // write("[$progressCount/ " . $trackCount . "] " . curl_getinfo($resource, CURLINFO_EFFECTIVE_URL), false);
-        write("$progressCount ", $trackCount == $progressCount, false);
+        write("<small>.</small>", $trackCount == $progressCount, false);
         curl_setopt($resource, CURLOPT_NOPROGRESS, true);
     }
 }
 
 function downloadExtraDataFromOverlay(): ?array
 {
-    write("Downloading unlocalized extra data from S3S Overlay...");
+    write("Downloading unlocalized extra data from S3S Overlay");
 
     $url         = "https://raw.githubusercontent.com/sector3studios/r3e-spectator-overlay/master/r3e-data.json";
     $fileContent = file_get_contents($url);
@@ -242,24 +242,20 @@ function downloadExtraDataFromOverlay(): ?array
 
 function addExtraDataFromOverlay(array &$trackList, array &$extraJsonLayouts)
 {
-    $layoutCount = 0;
+    write("Adding extra data to " . count($extraJsonLayouts) . " layouts");
 
     foreach ($extraJsonLayouts as $layoutItem) {
-        $layoutCount++;
-
         $trackId  = intval($layoutItem['Track']);
         $layoutId = intval($layoutItem['Id']);
 
         $trackList[$trackId]->layouts[$layoutId]->maxVehicules = intval($layoutItem['MaxNumberOfVehicles']);
     }
-
-    write("Added extra data for $layoutCount layouts.");
 }
 
 function writeCsv(array &$list, string $language)
 {
     $fileName = "r3e-tracks_$language.csv";
-    write("Creating Csv file '$fileName'...");
+    write("Creating CSV file <i>$fileName</i>");
     // TODO Escape "," and """ from all fields
 
     // UTF8 header
@@ -283,8 +279,6 @@ function writeCsv(array &$list, string $language)
 
     if (file_put_contents("../files/$fileName", $csvContent) === false) {
         write("ERROR writing csv file!");
-    } else {
-        write("CSV file created successfully!");
     }
 }
 
@@ -356,7 +350,7 @@ function getRequestHeader(string $language): array
 function write($text, bool $addLineBreak = true, bool $addTime = true)
 {
     $time = date("H:i:s");
-    echo "data:{\"message\":\"" . ($addTime ? "[$time] " : "") . $text . ($addLineBreak ? "<br />" : "") . "\"}\n\n";
+    echo "data:{\"message\":\"" . ($addTime ? "<small>[$time]</small> " : "") . $text . ($addLineBreak ? "<br />" : "") . "\"}\n\n";
     ob_flush();
     flush();
 }
