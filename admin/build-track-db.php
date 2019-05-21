@@ -17,10 +17,10 @@ DEFINE('GERMAN', 'de-DE');
 global $trackCount;
 global $progressCount;
 
-$startTime = microtime(true);
-
 $languages = [FRENCH, ENGLISH, ITALIAN, SPANISH, GERMAN];
+
 write("Starting script for " . count($languages) . " languages");
+$startTime = microtime(true);
 
 $extraDataJson = downloadExtraDataFromOverlay();
 $trackList     = downloadTrackList();
@@ -87,9 +87,6 @@ function downloadTrackDetails(array &$trackList, string $language)
 {
     write("Downloading details for " . count($trackList) . " tracks", false);
 
-    $count = 0;
-    $total = count($trackList);
-
     $curlList  = prepareCurlList($trackList, $language);
     $multiCurl = getMultiCurl($curlList);
     global $progressCount;
@@ -117,7 +114,7 @@ function downloadTrackDetails(array &$trackList, string $language)
 
         $vDiff = preg_replace("/(\d+)\s?m.*/", "$1", $trackItem['specs_data']['vertical_difference']);
 
-        $track->type             = $trackItem['specs_data']['track_type']; // Translated version only in detail page.
+        $track->type             = $trackItem['specs_data']['track_type'];
         $track->heightDifference = floatval($vDiff);
         $track->location         = $trackItem['specs_data']['location'];
         $track->description      = trim($trackItem['description']);
