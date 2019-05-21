@@ -36,7 +36,7 @@ write("<h3>Job complete!</h3>Total time: " . number_format($elapsedTime, 3) . " 
 
 finish();
 
-function createCsvForLanguage(array &$trackList, string $language, $extraDataJson)
+function createCsvForLanguage(array &$trackList, string $language, &$extraDataJson)
 {
     write("<strong><u>Language '$language'</u></strong>");
 
